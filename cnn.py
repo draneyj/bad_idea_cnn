@@ -17,9 +17,8 @@ def coord_to_corners(scaled_r):
                     ])
 
 
-# @partial(jax.jit, static_argnames=["ngrid", "nspecies"])
-def R_to_grids(scaled_R, species, scaled_box, ngrid, nspecies=3):
-    nx, ny, nz = ngrid
+@partial(jax.jit, static_argnames=["nx", "ny", "nz", "nspecies"])
+def R_to_grids(scaled_R, species, scaled_box, nx, ny, nz, nspecies=3):
     mapped_positions = jnp.zeros((nx, ny, nz, nspecies))
     # todo: check if there's a more numpy way to do this:
     meshgrid = jnp.array([[[[(x,y,z,s) for s in jnp.arange(nspecies)] for z in jnp.arange(nz)] for y in jnp.arange(ny)] for x in jnp.arange(nx)])
@@ -27,15 +26,11 @@ def R_to_grids(scaled_R, species, scaled_box, ngrid, nspecies=3):
         for r in scaled_R:
             corners = coord_to_corners(r)
             fr = jnp.floor(r)
-            print(f"r: {fr}")
             for x in [0, 1]:
                 for y in [0, 1]:
                     for z in [0, 1]:
-                        print(f"r: {fr + jnp.array([x,y,z])}")
-                        print(f"r mod: {jnp.mod(fr + jnp.array([x, y, z]), jnp.array([nx, ny, nz]))}")
                         mask = jnp.all(meshgrid[...,:3] == (jnp.mod(fr + jnp.array([x, y, z]), jnp.array([nx, ny, nz]))), axis=-1)
                         mask &= (meshgrid[...,3] == s)
-                        print(jnp.where(mask))
                         mapped_positions += jnp.where(mask, corners[x, y, z], 0)
     return mapped_positions
 
@@ -101,9 +96,9 @@ class CNN():
         return jnp.sum(x)
 
 
-@partial(jax.jit, static_argnames=["ngrid", "nspecies", "network"])
-def energy(kernels, network, scaled_R, species, scaled_box, ngrid, nspecies=3):
-    mapped_positions = R_to_grids(scaled_R, species, scaled_box, ngrid, nspecies=3)
+@partial(jax.jit, static_argnames=["nx", "ny", "nz", "nspecies", "network"])
+def energy(kernels, network, scaled_R, species, scaled_box, nx, ny, nz, nspecies=3):
+    mapped_positions = R_to_grids(scaled_R, species, scaled_box, nx, ny, nz, nspecies=3)
     return network(kernels, mapped_positions)
 
 
