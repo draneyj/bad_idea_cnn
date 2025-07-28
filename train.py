@@ -51,7 +51,7 @@ min_validation_loss = np.inf
 
 # initialize optimizer
 opt = optax.adam(lr)
-_, state = opt.init(kernels)
+state = opt.init(kernels)
 
 for i in range(numsteps):
     print(f"========== epoch {i} ==========")
@@ -68,7 +68,7 @@ for i in range(numsteps):
 
         print(f"nx: {nx}, ny: {ny}, nz: {nz}")
         loss, grad = jax.value_and_grad(loss_function, 0)(kernels, positions, scaled_box, nx, ny, nz, species, true_energy, true_forces)
-        updates, state = opt.update(grads, state)
+        updates, state = opt.update(grad, state)
         kernels = optax.apply_updates(kernels, updates)
         print(f"training row {j}: {loss}")
 
