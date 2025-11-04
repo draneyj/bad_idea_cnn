@@ -3,21 +3,18 @@ os.environ["JAX_DEBUG_LOG_MODULES"] = "jax._src.compiler,jax._src.lru_cache"
 os.environ["JAX_LOGGING_LEVEL"] = "DEBUG"
 os.environ["JAX_RAISE_PERSISTENT_CACHE_ERRORS"] = "True"
 import jax
-jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
-jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
-jax.config.update("jax_persistent_cache_enable_xla_caches", "True")
-jax.config.update("jax_explain_cache_misses", True)
-
 import jax.numpy as jnp
 import cnn
 import numpy as np
 import pickle
 import optax
 from functools import partial
-from datetime import datetime
 
 np.random.seed(72099)
 
+jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
+jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
+jax.config.update("jax_explain_cache_misses", True)
 
 # set up network parameters
 a = 3.577678
@@ -50,7 +47,7 @@ def scale_and_energy(kernels, positions, scaled_box, nx, ny, nz, species, kernel
     scaled_R = positions / scale 
     return cnn.energy(kernels, kernel_sizes, scaled_R, species, scaled_box, nx, ny, nz, nspecies=nspecies)
 
-energy_and_negforce = jax.jit(jax.value_and_grad(scale_and_energy, 1), static_argnames=["nx", "ny", "nz", "nspecies", "kernel_sizes"])
+energy_and_negforce = jax.value_and_grad(scale_and_energy, 1)
 
 @partial(jax.jit, static_argnames=["nx", "ny", "nz", "kernel_sizes"])
 def loss_function(kernels, positions, scaled_box, nx, ny, nz, species, kernel_sizes, true_energy, true_forces, e_weight=1.0, f_weight=1.0):
@@ -83,7 +80,7 @@ state = opt.init(kernels)
 
 for i in range(numsteps):
     print(f"========== epoch {i} ==========", flush=True)
-    for j, row in enumerate(train_rows[::-1]):
+    for j, row in enumerate(train_rows):
         positions = row['coordinates']
         orth_matrix = row['orth_matrix']
         species = jnp.array([smap[s] for s in row['species']])
@@ -95,9 +92,13 @@ for i in range(numsteps):
         ny = int(scaled_box[1][1] - scaled_box[1][0])
         nz = int(scaled_box[2][1] - scaled_box[2][0])
 
-        print(f"nx: {nx}, ny: {ny}, nz: {nz}, time: {datetime.now()}", flush=True)
+        compiled = vg_loss_function.lower(kernels, positions, scaled_box, nx, ny, nz, species, kernel_sizes, true_energy, true_forces).compiler_ir('hlo')
+        print(compiled.as_hlo_text(), flush=True)
+        
+        exit()
+
+        print(f"nx: {nx}, ny: {ny}, nz: {nz}", flush=True)
         loss, grad = vg_loss_function(kernels, positions, scaled_box, nx, ny, nz, species, kernel_sizes, true_energy, true_forces)
-        # exit()
         updates, state = opt.update(grad, state)
         kernels = optax.apply_updates(kernels, updates)
         print(f"training row {j}: {loss}", flush=True)

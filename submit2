@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name=train_cnn       # create a short name for your job
+#SBATCH --nodes=1                # node count
+#SBATCH --mem=64G
+#SBATCH --ntasks=1              # total number of tasks across all nodes. !! Change to 8 for REBO2
+#SBATCH --cpus-per-task=1        # cpu-cores per task (>1 if multi-threaded tasks)
+#SBATCH --time=1:00:00          # total run time limit (HH:MM:SS)
+#SBATCH --gres=gpu:1             # number of GPUs per node
+
+module purge
+module load anaconda3/2024.10
+# module load cudatoolkit/12.6
+module load openmpi/gcc/4.1.6
+conda activate jaxmd
+# export XLA_PYTHON_CLIENT_PREALLOCATE=false
+export XLA_PYTHON_CLIENT_MEM_FRACTION=.97
+# export XLA_FLAGS="--xla_gpu_enable_command_buffer="
+export JAX_COMPILATION_CACHE_DIR=$PWD/jax_cache
+python faketrain.py > compile.txt
